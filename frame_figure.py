@@ -90,6 +90,47 @@ class FrameFigure(ttk.Frame):
         else:
             self.x_length_bar_graph = self.combobox_x_length_bar_graph.get()
 
+    def choose_samples_bar_graph(self):
+        # self.frame_choose_samples_bar_graph  self.canvas_choose_samples_bar_graph  self.annotated_result
+        self.all_samples_name_bar_graph = self.annotated_result.columns.values.tolist()
+        self.all_samples_name_bar_graph.pop(), self.all_samples_name_bar_graph.pop()
+        print("self.all_samples_name_electropherogram")
+        print(self.all_samples_name_bar_graph)
+
+        for i, each in enumerate(self.all_samples_name_bar_graph):
+            frame_temp = tk.Frame(self.canvas_choose_samples_bar_graph)
+            self.canvas_choose_samples_bar_graph.create_window((5, 5 + i * 30), window=frame_temp, anchor="nw")
+            label = tk.Label(frame_temp, text=each[:-7])
+            label.pack(side="left")
+            exec('self.v{} = tk.IntVar()'.format("bar_graph" + str(i)))
+            exec('self.v{}.set(1)'.format("bar_graph" + str(i)))
+            exec('radiobutton_r = tk.Radiobutton(frame_temp, text="Remain", variable=self.v{},value=1)'.format("bar_graph" + str(i)))
+            exec('radiobutton_c = tk.Radiobutton(frame_temp, text="Cancel", variable=self.v{},value=0)'.format("bar_graph" + str(i)))
+            exec('radiobutton_r.pack(side="left")')
+            exec('radiobutton_c.pack(side="left")')
+
+        # self.choose_color_bar_electropherogram()
+
+    def get_choose_samples_bar_graph(self):
+        """获取用户选择的samples_of_bar_graph"""
+
+        # self.all_samples_name_electropherogram用户选择所要显示sample之前所有的sample,
+        # self.selected_samples_name_electropherogram 用户选择之后的samples
+        self.selected_samples_name_bar_graph = []
+        ### 获取用户所选的samples
+        for i, each in enumerate(self.all_samples_name_bar_graph):
+            loc = locals()
+            exec('select_result = self.v{}.get()'.format("bar_graph" + str(i)))
+            select_result = loc['select_result']
+            print(select_result)
+
+            if select_result == 1:
+                self.selected_samples_name_bar_graph.append(each)
+        print("self.selected_samples_name_bar_graph")
+        print(self.selected_samples_name_bar_graph)
+
+        self.choose_color_bar_bar_graph()
+
     def choose_color(self, event):
         color = tkinter.colorchooser.askcolor()
         # print(color)
@@ -100,9 +141,16 @@ class FrameFigure(ttk.Frame):
 
     def choose_color_bar_bar_graph(self):
         # self.frame_color_bar_bar_graph  self.canvas_color_bar_bar_graph  self.annotated_result
-        self.samples_name_bargraph = self.annotated_result.columns.values.tolist()
-        self.samples_name_bargraph.pop(), self.samples_name_bargraph.pop()
-        for i, each in enumerate(self.samples_name_bargraph):
+
+        # 先删除原有子组件
+        for widget in self.canvas_color_bar_bar_graph.winfo_children():
+            widget.destroy()
+
+        self.canvas_color_bar_bar_graph.config(
+            scrollregion=(0, 0, len(self.selected_samples_name_bar_graph) * 30,
+                          len(self.selected_samples_name_bar_graph) * 30))
+
+        for i, each in enumerate(self.selected_samples_name_bar_graph):
             frame_temp = tk.Frame(self.canvas_color_bar_bar_graph)
             self.canvas_color_bar_bar_graph.create_window((5, 5 + i * 30), window=frame_temp, anchor="nw")
             label = tk.Label(frame_temp, text=each[:-7])
@@ -125,7 +173,7 @@ class FrameFigure(ttk.Frame):
             tkinter.messagebox.showinfo(title="warning", message="Invalid MTU range")
             return
 
-        ### 获取一些参数
+        ### 获取一些参数  self.selected_samples_name_bar_graph
         self.get_annotation_bar_graph()
         self.get_legend_bar_graph()
         self.get_annotation_rotation_bar_graph()
@@ -133,7 +181,7 @@ class FrameFigure(ttk.Frame):
         self.get_yticks_bar_graph()
         auto_color = 0
         color_list = []
-        for i, each in enumerate(self.samples_name_bargraph):
+        for i, each in enumerate(self.selected_samples_name_bar_graph):
             exec('color_list.append(self.button_{}_bargraph["text"])'.format(i))
         print(color_list)
         # if self.x_length_bar_graph == 20:
@@ -153,11 +201,14 @@ class FrameFigure(ttk.Frame):
                     tkinter.messagebox.showinfo(title="warning", message="please choose color")
                     return
 
-        ### 基础柱状图
+        ### 基础柱状图 根据用户所选范围截取有效数据 及所需展示的samples  self.selected_samples_name_bar_graph
         annotated_result = self.annotated_result[
             self.var_MTU_start_bar_graph.get() <= self.annotated_result["mean_MTU"]]
         annotated_result = annotated_result[annotated_result["mean_MTU"] <= self.var_MTU_end_bar_graph.get()]
-        dataframe_plot = annotated_result.iloc[:, :-2]
+        dataframe_plot = pd.DataFrame()
+        for each in self.selected_samples_name_bar_graph:
+            dataframe_plot[each] = annotated_result[each]
+        # dataframe_plot = annotated_result.iloc[:, :-2]
 
         x_label = [str(i) for i in annotated_result["mean_MTU"].tolist()]  # mean_MTU
         legend_label = [i[:-7] for i in dataframe_plot.columns.values.tolist()]
@@ -284,11 +335,55 @@ class FrameFigure(ttk.Frame):
         else:
             self.x_length_mean_SD = self.combobox_x_length_mean_SD.get()
 
+    def choose_groups_mean_SD(self):
+        # self.frame_choose_samples_bar_graph  self.canvas_choose_samples_bar_graph  self.annotated_result
+        self.all_group_name_mean_SD = list(self.dict_replicates_groups.keys())
+
+
+        for i, each in enumerate(self.all_group_name_mean_SD):
+            frame_temp = tk.Frame(self.canvas_choose_groups_mean_SD)
+            self.canvas_choose_groups_mean_SD.create_window((5, 5 + i * 30), window=frame_temp, anchor="nw")
+            label = tk.Label(frame_temp, text=each)
+            label.pack(side="left")
+            exec('self.v{} = tk.IntVar()'.format("mean_SD" + str(i)))
+            exec('self.v{}.set(1)'.format("mean_SD" + str(i)))
+            exec('radiobutton_r = tk.Radiobutton(frame_temp, text="Remain", variable=self.v{},value=1)'.format("mean_SD" + str(i)))
+            exec('radiobutton_c = tk.Radiobutton(frame_temp, text="Cancel", variable=self.v{},value=0)'.format("mean_SD" + str(i)))
+            exec('radiobutton_r.pack(side="left")')
+            exec('radiobutton_c.pack(side="left")')
+
+        # self.choose_color_bar_electropherogram()
+
+    def get_choose_groups_mean_SD(self):
+        """获取用户选择的groups_of_mean_SD"""
+
+        # self.all_group_name_mean_SD用户选择所要显示group之前所有的group,
+        # self.selected_groups_mean_SD 用户选择之后的group
+        self.selected_groups_mean_SD = []
+        ### 获取用户所选的samples
+        for i, each in enumerate(self.all_group_name_mean_SD):
+            loc = locals()
+            exec('select_result = self.v{}.get()'.format("mean_SD" + str(i)))
+            select_result = loc['select_result']
+            print(select_result)
+
+            if select_result == 1:
+                self.selected_groups_mean_SD.append(each)
+
+        self.choose_color_bar_mean_SD()
+
     def choose_color_bar_mean_SD(self):
         # self.frame_color_bar_mean_SD  self.canvas_color_bar_mean_SD  self.dict_replicates_groups
-        self.group_name_mean_SD = list(self.dict_replicates_groups.keys())
 
-        for i, each in enumerate(self.group_name_mean_SD):
+        # 先删除原有子组件
+        for widget in self.canvas_color_bar_mean_SD.winfo_children():
+            widget.destroy()
+
+        self.canvas_color_bar_mean_SD.config(
+            scrollregion=(0, 0, len(self.selected_groups_mean_SD) * 30,
+                          len(self.selected_groups_mean_SD) * 30))
+
+        for i, each in enumerate(self.selected_groups_mean_SD):
             frame_temp = tk.Frame(self.canvas_color_bar_mean_SD)
             self.canvas_color_bar_mean_SD.create_window((5, 5 + i * 30), window=frame_temp, anchor="nw")
             label = tk.Label(frame_temp, text=each)
@@ -315,7 +410,7 @@ class FrameFigure(ttk.Frame):
         self.get_x_length_mean_SD()
         color_list = []
         auto_color = 0
-        for i, each in enumerate(self.group_name_mean_SD):
+        for i, each in enumerate(self.selected_groups_mean_SD):
             exec('color_list.append(self.button_{}_mean_SD["text"])'.format(i))
         print(color_list)
         # if self.x_length_mean_SD == 20:
@@ -356,17 +451,17 @@ class FrameFigure(ttk.Frame):
             self.dict_dataframe_replicates_groups[each[0]] = dataframe_temp
         print(self.dict_dataframe_replicates_groups)
 
-        ### 创建新的做图dataframe columns=["mean_MTU", group_name1, group_name2...]
+        ### 创建新的做图dataframe columns=["mean_MTU", group_name1, group_name2...] self.selected_groups_mean_SD
         self.dataframe_replicates_groups_mean = pd.DataFrame()
         self.dataframe_replicates_groups_std = pd.DataFrame()
         self.dataframe_replicates_groups_meanstd = pd.DataFrame()  # 存放std+mean的值 将来出图std的真实高度
         for each in self.dict_dataframe_replicates_groups.items():
             self.dataframe_replicates_groups_mean["mean_MTU"] = each[1]["mean_MTU"]
-            self.dataframe_replicates_groups_mean[each[0]] = each[1]["mean_height"]
             self.dataframe_replicates_groups_std["mean_MTU"] = each[1]["mean_MTU"]
-            # self.dataframe_replicates_groups_std[each[0]] = each[1]["std"]
-            self.dataframe_replicates_groups_std[each[0]] = each[1]["std"]
-            self.dataframe_replicates_groups_meanstd[each[0]] = each[1]["mean_height"] + each[1]["std"]
+            if each[0] in self.selected_groups_mean_SD:  # 用户选择的groups
+                self.dataframe_replicates_groups_mean[each[0]] = each[1]["mean_height"]
+                self.dataframe_replicates_groups_std[each[0]] = each[1]["std"]
+                self.dataframe_replicates_groups_meanstd[each[0]] = each[1]["mean_height"] + each[1]["std"]
 
         print(self.dataframe_replicates_groups_mean)
         print(self.dataframe_replicates_groups_std)
@@ -627,10 +722,10 @@ class FrameFigure(ttk.Frame):
             self.canvas_color_bar_electropherogram.create_window((5, 5 + i * 30), window=frame_temp, anchor="nw")
             label = tk.Label(frame_temp, text=each[:-7])
             label.pack(side="left")
-            exec('self.button_{}_bargraph = tk.Button(frame_temp, text="color")'.format(i))
-            exec('self.button_{}_bargraph.pack(side="left", padx=5)'.format(i))
+            exec('self.button_{}_electropherogram = tk.Button(frame_temp, text="color")'.format(i))
+            exec('self.button_{}_electropherogram.pack(side="left", padx=5)'.format(i))
             # exec('self.button_{}_bargraph.config(command=self.choose_color)'.format(i))
-            exec('self.button_{}_bargraph.bind("<Button-1>",self.choose_color)'.format(i))
+            exec('self.button_{}_electropherogram.bind("<Button-1>",self.choose_color)'.format(i))
 
     def show_electropherogram(self):
 
@@ -648,7 +743,7 @@ class FrameFigure(ttk.Frame):
         color_list = []
         auto_color = 0
         for i, each in enumerate(self.selected_samples_name_electropherogram):
-            exec('color_list.append(self.button_{}_bargraph["text"])'.format(i))
+            exec('color_list.append(self.button_{}_electropherogram["text"])'.format(i))
         print(color_list)
         # if self.x_length_electropherogram == 20:
         #     pass
@@ -1096,6 +1191,28 @@ class FrameFigure(ttk.Frame):
         self.combobox_x_length_bar_graph.current(1)
         self.combobox_x_length_bar_graph.bind("<<ComboboxSelected>>", self.get_x_length_bar_graph)
 
+        self.frame_choose_samples_bar_graph_ensure = ttk.Frame(self.frame_choose_figure)
+        self.frame_choose_samples_bar_graph_ensure.pack(side="top", fill="x", padx=5)
+        self.label_choose_samples_bar_graph = ttk.Label(self.frame_choose_samples_bar_graph_ensure,
+                                                               text="samples")
+        self.label_choose_samples_bar_graph.pack(side="left", fill="x", padx=5, pady=5, anchor="w")
+        self.button_ensure_choose_samples_bar_graph = ttk.Button(self.frame_choose_samples_bar_graph_ensure, text="ok",
+                                                       command=self.get_choose_samples_bar_graph)
+        self.button_ensure_choose_samples_bar_graph.pack(side="left", padx=5, anchor="w")
+
+        self.frame_choose_samples_bar_graph = ttk.Frame(self.frame_choose_figure)
+        self.frame_choose_samples_bar_graph.pack(side="top", fill="x", padx=5)
+        self.canvas_choose_samples_bar_graph = tk.Canvas(self.frame_choose_samples_bar_graph, height=100,
+                                                                scrollregion=(
+                                                                    0, 0, self.len_samples * 30, self.len_samples * 30))
+        self.vbar_choose_samples_bar_graph = tk.Scrollbar(self.frame_choose_samples_bar_graph)
+        self.vbar_choose_samples_bar_graph.pack(side="left", fill="y")
+        self.vbar_choose_samples_bar_graph.config(command=self.canvas_choose_samples_bar_graph.yview)
+        self.canvas_choose_samples_bar_graph.config(height=100)  # width=290,
+        self.canvas_choose_samples_bar_graph.config(yscrollcommand=self.vbar_choose_samples_bar_graph.set)
+        self.canvas_choose_samples_bar_graph.pack(side="right", expand=True, fill="both", padx=5)
+        self.choose_samples_bar_graph()
+
         self.label_color_bar_bar_graph = ttk.Label(self.frame_choose_figure, text="color bar")
         self.label_color_bar_bar_graph.pack(side="top", fill="x", padx=10, pady=5, anchor="w")
         self.frame_color_bar_bar_graph = ttk.Frame(self.frame_choose_figure)
@@ -1111,7 +1228,7 @@ class FrameFigure(ttk.Frame):
         self.canvas_color_bar_bar_graph.config(yscrollcommand=self.vbar_color_bar_bar_graph.set)
         # self.canvas_color_bar_bar_graph.pack(side="left", expand=True, fill="both", padx=5)
         self.canvas_color_bar_bar_graph.pack(side="right", expand=True, fill="both", padx=5)
-        self.choose_color_bar_bar_graph()
+        # self.choose_color_bar_bar_graph()
 
         self.button_bar_graph_show = ttk.Button(self.frame_choose_figure, text="bar graph", command=self.show_bar_graph,
                                                 state="readonly")
@@ -1221,6 +1338,28 @@ class FrameFigure(ttk.Frame):
         self.combobox_x_length_mean_SD.current(1)
         self.combobox_x_length_mean_SD.bind("<<ComboboxSelected>>", self.get_x_length_mean_SD)
 
+        self.frame_choose_groups_mean_SD_ensure = ttk.Frame(self.frame_choose_figure)
+        self.frame_choose_groups_mean_SD_ensure.pack(side="top", fill="x", padx=5)
+        self.label_choose_groups_mean_SD = ttk.Label(self.frame_choose_groups_mean_SD_ensure,
+                                                               text="samples")
+        self.label_choose_groups_mean_SD.pack(side="left", fill="x", padx=5, pady=5, anchor="w")
+        self.button_ensure_choose_groups_mean_SD = ttk.Button(self.frame_choose_groups_mean_SD_ensure, text="ok",
+                                                       command=self.get_choose_groups_mean_SD)
+        self.button_ensure_choose_groups_mean_SD.pack(side="left", padx=5, anchor="w")
+
+        self.frame_choose_groups_mean_SD = ttk.Frame(self.frame_choose_figure)
+        self.frame_choose_groups_mean_SD.pack(side="top", fill="x", padx=5)
+        self.canvas_choose_groups_mean_SD = tk.Canvas(self.frame_choose_groups_mean_SD, height=100,
+                                                                scrollregion=(
+                                                                    0, 0, len(self.dict_replicates_groups) * 30, len(self.dict_replicates_groups) * 30))
+        self.vbar_choose_groups_mean_SD = tk.Scrollbar(self.frame_choose_groups_mean_SD)
+        self.vbar_choose_groups_mean_SD.pack(side="left", fill="y")
+        self.vbar_choose_groups_mean_SD.config(command=self.canvas_choose_groups_mean_SD.yview)
+        self.canvas_choose_groups_mean_SD.config(height=100)  # width=290,
+        self.canvas_choose_groups_mean_SD.config(yscrollcommand=self.vbar_choose_groups_mean_SD.set)
+        self.canvas_choose_groups_mean_SD.pack(side="right", expand=True, fill="both", padx=5)
+        self.choose_groups_mean_SD()
+
         self.label_color_bar_mean_SD = ttk.Label(self.frame_choose_figure, text="color bar")
         self.label_color_bar_mean_SD.pack(side="top", fill="x", padx=10, pady=5, anchor="w")
         self.frame_color_bar_mean_SD = ttk.Frame(self.frame_choose_figure)
@@ -1233,7 +1372,7 @@ class FrameFigure(ttk.Frame):
         self.canvas_color_bar_mean_SD.config(height=100)  # width=290,
         self.canvas_color_bar_mean_SD.config(yscrollcommand=self.vbar_color_bar_mean_SD.set)
         self.canvas_color_bar_mean_SD.pack(side="right", expand=True, fill="both", padx=5)
-        self.choose_color_bar_mean_SD()
+        # self.choose_color_bar_mean_SD()
 
         self.button_mean_SD = ttk.Button(self.frame_choose_figure, text="mean and S.D.", command=self.show_mean_SD,
                                          state="disabled")
@@ -1426,6 +1565,7 @@ class FrameFigure(ttk.Frame):
                                                             command=self.show_real_electropherogram)
         self.button_real_electropherogram_show.pack(padx=5, pady=5, anchor="w")
         """
+
 
 
 if __name__ == "__main__":

@@ -491,7 +491,7 @@ class FrameDatabase(ttk.Frame):
             return
 
         self.frame_update_input = ttk.Frame(self.frame_show_database)
-        self.frame_update_input.pack(side="top", fill="x", padx=5, pady=5)
+        self.frame_update_input.pack(side="top", fill="x", padx=5)
         self.button_update_input = ttk.Button(self.frame_update_input, text="input", command=self.update_input)
         self.button_update_input.pack(side="left", padx=5, pady=5, anchor="e")
         self.var_update_color = tk.StringVar()
@@ -512,7 +512,7 @@ class FrameDatabase(ttk.Frame):
                                                              selectmode='extended',
                                                              show='headings',
                                                              yscrollcomman=self.scrollbar_update_input_show.set)
-        self.treeview_sheet_update_input_show.pack(fill="both", side="left", padx=3, pady=5)
+        self.treeview_sheet_update_input_show.pack(fill="both", side="left", padx=3)
         self.scrollbar_update_input_show.pack(fill="y", side="right", padx=3, pady=5)
         self.scrollbar_update_input_show.config(command=self.treeview_sheet_update_input_show.yview)
 
@@ -520,10 +520,17 @@ class FrameDatabase(ttk.Frame):
         # --------------------------------------------------------------------------------------------------------------
 
         self.frame_update_match = ttk.Frame(self.frame_show_database)
-        self.frame_update_match.pack(side="top", fill="x", padx=5, pady=5)
-        self.button_update_match = ttk.Button(self.frame_update_match, text="match", command=self.update_match,
+        self.frame_update_match.pack(side="top", fill="x", padx=5)
+        self.button_update_match = ttk.Button(self.frame_update_match, text="match1", command=self.update_match,
                                               state="disabled")
         self.button_update_match.pack(side="left", padx=5, pady=5, anchor="e")
+        self.label_update_match = ttk.Label(self.frame_update_match, text="(samplename = glycanname)")
+        self.label_update_match.pack(side="left", pady=5, anchor="e")
+        self.button_update_match2 = ttk.Button(self.frame_update_match, text="match2", command=self.update_match2,
+                                              state="disabled")
+        self.button_update_match2.pack(side="left", padx=5, pady=5, anchor="e")
+        self.label_update_match2 = ttk.Label(self.frame_update_match, text="(samplename = XXX_glycanname.fsa)")
+        self.label_update_match2.pack(side="left", pady=5, anchor="e")
         self.button_update_match_view = ttk.Button(self.frame_update_match, text="view", command=self.update_match_view,
                                                    state="disabled")
         self.button_update_match_view.pack(side="left", padx=5, pady=5, anchor="e")
@@ -539,7 +546,7 @@ class FrameDatabase(ttk.Frame):
                                                              selectmode='extended',
                                                              show='headings',
                                                              yscrollcomman=self.scrollbar_update_match_show.set)
-        self.treeview_sheet_update_match_show.pack(fill="both", side="left", padx=3, pady=5)
+        self.treeview_sheet_update_match_show.pack(fill="both", side="left", padx=3)
         self.scrollbar_update_match_show.pack(fill="y", side="right", padx=3, pady=5)
         self.scrollbar_update_match_show.config(command=self.treeview_sheet_update_match_show.yview)
         # self.treeview_sheet_update_match_show.bind('<ButtonRelease-1>', self.update_get_delete_record)
@@ -548,7 +555,7 @@ class FrameDatabase(ttk.Frame):
         # --------------------------------------------------------------------------------------------------------------
 
         self.frame_update_update_to_database = ttk.Frame(self.frame_show_database)
-        self.frame_update_update_to_database.pack(side="top", fill="x", padx=5, pady=5)
+        self.frame_update_update_to_database.pack(side="top", fill="x", padx=5)
         self.var_update_date = tk.StringVar(value=time.strftime("%Y-%m-%d", time.localtime()))
         self.entry_update_date = ttk.Entry(self.frame_update_update_to_database, textvariable=self.var_update_date,
                                            width=15, state="disabled")
@@ -570,7 +577,7 @@ class FrameDatabase(ttk.Frame):
         try:
             self.update_raw_data = pd.read_csv(filename, sep="\t", engine='python', encoding='utf-8',
                                                error_bad_lines=False)
-            self.update_raw_data_extract = self.update_raw_data.loc[:, ["Dye/Sample Peak", "Sample File Name", "Size"]]
+            self.update_raw_data_extract = self.update_raw_data.loc[:, ["Dye/Sample Peak", "Sample File Name", "Size","Height"]]
             print(self.update_raw_data)
             print(self.update_raw_data_extract)
             # 提取本次添加的数据
@@ -591,6 +598,7 @@ class FrameDatabase(ttk.Frame):
         ### 提取self.update_raw_data_extract中相应颜色的数据
         self.update_raw_data_extract = self.update_raw_data_extract[self.update_raw_data_extract \
             [self.update_raw_data_extract.columns[0]].str.contains(self.combobox_update_color.get())]
+        print("self.update_raw_data_extract")
         print(self.update_raw_data_extract)
 
         self.button_update_input_view.config(state="normal")
@@ -616,6 +624,7 @@ class FrameDatabase(ttk.Frame):
             self.treeview_sheet_update_input_show.insert("", "end", values=temp)
 
         self.button_update_match.config(state="normal")
+        self.button_update_match2.config(state="normal")
         self.button_update_input.config(state="disabled")
         self.combobox_update_color.config(state="disabled")
 
@@ -625,12 +634,14 @@ class FrameDatabase(ttk.Frame):
         for index, row in self.update_raw_data_extract.iterrows():
             # print(row[0], row[1])
             if row[1] not in self.dict_update_match.keys():
-                self.dict_update_match[row[1]] = [row[2]]
+                self.dict_update_match[row[1]] = [[row[2], row[3]]]
             else:
-                self.dict_update_match[row[1]].append(row[2])
+                self.dict_update_match[row[1]].append([row[2], row[3]])
+        print("self.dict_update_match")
+        print(self.dict_update_match)
 
         ##### 针对于每一个源数据中的glycan_name，在数据库中找其相对应的最新的MTU值
-        self.update_match_result = pd.DataFrame(columns=["name of glycan", "new_MTU", "latest_MTU", "new"])
+        self.update_match_result = pd.DataFrame(columns=["name of glycan", "new_MTU", "height", "latest_MTU", "new"])
         for each in self.dict_update_match.keys():
             print(each)
             index = self.dataframe_database[self.dataframe_database["name_of_glycan"] == each].index.tolist()
@@ -649,20 +660,80 @@ class FrameDatabase(ttk.Frame):
                                                 "flag": temp[3]}, ignore_index=True)
 
             if match_find.empty:  # 数据库中无该glycan记录
-                for new_MTU in self.dict_update_match[each]:
+                for [new_MTU, height] in self.dict_update_match[each]:
                     self.update_match_result = self.update_match_result.append(
-                        {"name of glycan": each, "new_MTU": new_MTU,
+                        {"name of glycan": each, "new_MTU": new_MTU, "height": height,
                          "latest_MTU": "None", "new": "Yes"}, ignore_index=True)
             else:
                 print(each)
                 # 找出与上次测量最相近的MTU
                 latest_MTU = float(match_find.sort_values(by="date").iloc[-1]["MTU"])
-                new_MTU = self.dict_update_match[each][0]
-                for i_MTU in self.dict_update_match[each]:
+                new_MTU = self.dict_update_match[each][0][0]
+                height = self.dict_update_match[each][0][1]
+                for [i_MTU, i_height] in self.dict_update_match[each]:
                     if abs(latest_MTU - new_MTU) > abs(latest_MTU - i_MTU):
                         new_MTU = i_MTU
+                        height = i_height
 
                 self.update_match_result = self.update_match_result.append({"name of glycan": each, "new_MTU": new_MTU,
+                                                                            "height": height,
+                                                                            "latest_MTU": latest_MTU, "new": "No"},
+                                                                           ignore_index=True)
+        # print(self.update_match_result)
+        self.button_update_match_view.config(state="normal")
+
+    def update_match2(self):
+        ##### # 源数据的glycan_name作为键 值为相应的MTU列表
+        self.dict_update_match = {}
+        for index, row in self.update_raw_data_extract.iterrows():
+            # print(row[0], row[1]) # B,18 B01_GM1-dg.fsa
+            index1 = row[1].find("_")
+            index2 = row[1].find(".")
+            name = row[1][index1+1:index2]
+            if name not in self.dict_update_match.keys():
+                self.dict_update_match[name] = [[row[2], row[3]]]  # row[2]:MTU row[3]:height
+            else:
+                self.dict_update_match[name].append([row[2], row[3]])
+        print("self.dict_update_match")
+        print(self.dict_update_match)
+
+        ##### 针对于每一个源数据中的glycan_name，在数据库中找其相对应的最新的MTU值
+        self.update_match_result = pd.DataFrame(columns=["name of glycan", "new_MTU", "height", "latest_MTU", "new"])
+        for each in self.dict_update_match.keys():
+            print(each)
+            index = self.dataframe_database[self.dataframe_database["name_of_glycan"] == each].index.tolist()
+            match_find = pd.DataFrame(columns=["name of glycan", "MTU", "date", "flag"])
+            search_result = []
+            # eg: [['test1', 8.98, datetime.date(2019, 3, 10), 'manu'], ['test1', 8.99, datetime.date(2019, 3, 15), 'manu']]
+            if index != []:
+                for each_index in index:
+                    # print(self.dataframe_database.iloc[each])
+                    temp = []
+                    for i, col in enumerate(self.dataframe_database.columns):
+                        temp.append(self.dataframe_database.iloc[each_index, i])
+                    search_result.append(temp)
+            for temp in search_result:
+                match_find = match_find.append({"name of glycan": temp[0], "MTU": temp[1], "date": temp[2],
+                                                "flag": temp[3]}, ignore_index=True)
+
+            if match_find.empty:  # 数据库中无该glycan记录
+                for [new_MTU, height] in self.dict_update_match[each]:
+                    self.update_match_result = self.update_match_result.append(
+                        {"name of glycan": each, "new_MTU": new_MTU, "height": height,
+                         "latest_MTU": "None", "new": "Yes"}, ignore_index=True)
+            else:
+                print(each)
+                # 找出与上次测量最相近的MTU
+                latest_MTU = float(match_find.sort_values(by="date").iloc[-1]["MTU"])
+                new_MTU = self.dict_update_match[each][0][0]
+                height = self.dict_update_match[each][0][1]
+                for [i_MTU, i_height] in self.dict_update_match[each]:
+                    if abs(latest_MTU - new_MTU) > abs(latest_MTU - i_MTU):
+                        new_MTU = i_MTU
+                        height = i_height
+
+                self.update_match_result = self.update_match_result.append({"name of glycan": each, "new_MTU": new_MTU,
+                                                                            "height": height,
                                                                             "latest_MTU": latest_MTU, "new": "No"},
                                                                            ignore_index=True)
         # print(self.update_match_result)

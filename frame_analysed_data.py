@@ -518,7 +518,7 @@ class FrameAnalysedData(ttk.Frame):
         else:
             df_nor_or_rel.to_excel(filename)
 
-    """
+
     def sort_data_by_MTU(self):
         # self.sort_ranging  self.dict_nor_or_rel
         sample_name = list(self.dict_nor_or_rel.keys())
@@ -592,17 +592,35 @@ class FrameAnalysedData(ttk.Frame):
         print(self.sort_data_by_MTU)
         self.button_sort_data_by_MTU_view.config(state="normal")
         self.button_sort_data_by_MTU_download.config(state="normal")
-    """
+
 
     def help_std(self, info):
         # info = {"a":[1,2],"b":[2,3],"c":[9,8]} #求1，2，9方差
+        # 不管为空的
         value = []
-        for i, j in enumerate(info.items()): #  j = ('a', [1, 2])
+        for i, j in enumerate(info.items()):  # j = ('a', [1, 2])
             if j[1][0] != None:
                 value.append(j[1][0])
-        return np.std(np.array(value))
+        if value == []:
+            std = 0
+        else:
+            std = np.std(np.array(value))
+        return std
+
+    # def help_std2(self, info):
+    #     # 为空的设置为0参与std  效果不好
+    #     value = []
+    #     for i, j in enumerate(info.items()):  # j = ('a', [1, 2])
+    #         if j[1][0] != None:
+    #             value.append(j[1][0])
+    #         else:
+    #             value.append(0)
+    #     print(value)
+    #     return np.std(np.array(value))
+
 
     def sort_data_by_MTU2(self):
+        # 两次std比较中，第一次只比较当前行，第二次比较(std当前行+std上一行)
         # self.sort_ranging  self.dict_nor_or_rel
         sample_name = list(self.dict_nor_or_rel.keys())
 
@@ -693,11 +711,11 @@ class FrameAnalysedData(ttk.Frame):
                         if current_sort_min[1][0] > j[1][0]:
                             current_sort_min = j
                 # 看之前是空的的后一位在不在新范围内
-                for i, j in enumerate(current_sort_line.items()): # j =（"a"，[None, 0])
+                for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
                     if j[1] == [None, 0]:
                         if current_index[i] != None:
                             if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
-                                current_sort_line[j[0]] = j[1]
+                                current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
                                 current_index[i] += 1  # 序号向下走一位
                                 if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
                                     current_index[i] = None
@@ -737,6 +755,991 @@ class FrameAnalysedData(ttk.Frame):
         print(self.sort_data_by_MTU)
         self.button_sort_data_by_MTU_view.config(state="normal")
         self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def help_min(self, current_info):
+        # 每一轮排序的最小值 info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+        current_sort_min = list(current_info.items())[0]  # ('a', [1, 2])/('a', [None, 0])
+        for i, j in enumerate(current_info.items()):
+            # print(j[1][0])
+            if current_sort_min[1] == [None, 0] and j[1] != [None, 0]:
+                current_sort_min = j
+            if current_sort_min[1] != [None, 0] and j[1] != [None, 0]:
+                if j[1][0] < current_sort_min[1][0]:
+                    current_sort_min = j
+        return current_sort_min
+
+    def sort_data_by_MTU3(self):
+        # 两次std比较中，二次都比较(std当前行+std上一行)
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        current_index = [0 for i in range(len(sample_name))]  # 每个sample当前排序到的位置
+        current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+        current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}  # current_sort_line_before
+
+        while True:
+            current_info = {}
+            for i, j in enumerate(sample_name):
+                if current_index[i] == None:
+                    current_info[j] = [None, 0]
+                else:
+                    current_info[j] = [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]]
+            # current_info = {j: [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]] for i, j in enumerate(sample_name)}
+            # info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+            # 每个sample当前排序到的位置的信息
+
+            # 判断是否完成全部排序，跳出循环
+            if current_index == [None for i in range(len(sample_name))]:
+                break
+
+            ### 普通排序
+            # 每一轮排序的最小值
+            current_sort_min = self.help_min(current_info)
+            current_sort_line[current_sort_min[0]] = current_sort_min[1]  # 将最小值放到正在填充的那行中
+            # 开始比较
+            for i, j in enumerate(current_info.items()):
+                if j[1] != [None, 0]:
+                    if j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line[j[0]] = j[1]
+                        current_index[i] += 1  # 序号向下走一位
+                        if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                            current_index[i] = None
+
+            ### 判断current_sort_line中不为空的后面一个是否在阈值内 更新current_sort_line_replace  current_sort_line
+            for i, j in enumerate(current_sort_line.items()):  # j = ('a', [1, 2])
+                if j[1] != [None, 0] and current_index[i] != None:
+                    # 他的后一个
+                    # print(current_sort_line)
+                    # print(current_index)
+                    # print(self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2])
+                    next_info = {j[0]: [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]}
+                    # next_info = {"c":[9,8]}
+                    ## 判断下一个是否在范围内
+                    if next_info[j[0]][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line_next = copy.deepcopy(current_sort_line)
+                        current_sort_line_next[j[0]] = next_info[j[0]]
+                        # print("next_info", next_info)
+                        # print(current_sort_line)
+                        # print(current_sort_line_next)
+                        current_sort_line_replace_next = copy.deepcopy(current_sort_line_replace)
+                        current_sort_line_replace_next[j[0]] = current_sort_line[j[0]]
+                        # print(current_sort_line_replace)
+                        # print(current_sort_line_replace_next)
+                        # print("next",self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next))
+                        # print(self.help_std(current_sort_line)+self.help_std(current_sort_line_replace))
+                        ## 比较current_sort_line_next和current_sort_line的方差
+                        if (self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next)) < (self.help_std(current_sort_line)+self.help_std(current_sort_line_replace)):
+                            # std小，在current_sort_line_replace中换原值，在current_sort_line中替换next,
+                            current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                            current_sort_line[j[0]] = next_info[j[0]]
+                            current_index[i] += 1  # 序号向下走一位
+                            if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                current_index[i] = None
+
+            ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+            if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                # 添加完成后将current_sort_line至空，开始新的一行排序
+            else:  ### current_sort_line_replace不为空
+                # 找到当前current_sort_line的最小值
+                current_sort_min = self.help_min(current_sort_line)
+                # 看之前是空的的后一位在不在新范围内
+                for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                    if j[1] == [None, 0]:
+                        if current_index[i] != None:
+                            if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                                current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
+                                current_index[i] += 1  # 序号向下走一位
+                                flag_replace = 1  # 替换
+                                if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                    current_index[i] = None
+                # 以上将所有能放在current_sort_line 和current_sort_line_replace中的都取出
+                # 接下来看看current_sort_line还有哪些可以放到current_sort_line_replace
+                for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                    if j[1] != [None, 0] and current_sort_line_replace[j[0]] == [None, 0]:  # 看看底下的能不能放上面
+                        temp_current_sort_line = copy.deepcopy(current_sort_line)
+                        temp_current_sort_line_replace = copy.deepcopy(current_sort_line_replace)
+                        temp_current_sort_line_replace[j[0]] = temp_current_sort_line[j[0]]
+                        temp_current_sort_line[j[0]] = [None, 0]
+                        # print(j)
+                        # print(current_sort_line_replace)
+                        # print(temp_current_sort_line_replace)
+                        # print(current_sort_line)
+                        # print(temp_current_sort_line)
+                        # print("temp",self.help_std(temp_current_sort_line) + self.help_std(temp_current_sort_line_replace))
+                        # print(self.help_std(current_sort_line) + self.help_std(current_sort_line_replace))
+                        if (self.help_std(temp_current_sort_line) + self.help_std(temp_current_sort_line_replace)) < (self.help_std(current_sort_line) + self.help_std(current_sort_line_replace)):  # 换
+                            current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                            current_sort_line[j[0]] = [None, 0]
+
+                # 将current_sort_line和current_sort_line_replace都更新到self.sort_data_by_MTU
+                temp_dict = {}
+                for each in current_sort_line_replace.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                # 添加完成后将current_sort_line和current_sort_line_replace至空，开始新的一行排序
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}
+
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        # print(self.sort_data_by_MTU)
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def sort_data_by_MTU4(self):
+        # 两次std比较中，两次都次只比较当前行 不合理
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        current_index = [0 for i in range(len(sample_name))]  # 每个sample当前排序到的位置
+        current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+        current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}  # current_sort_line_before
+
+        while True:
+            current_info = {}
+            for i, j in enumerate(sample_name):
+                if current_index[i] == None:
+                    current_info[j] = [None, 0]
+                else:
+                    current_info[j] = [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]]
+            # current_info = {j: [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]] for i, j in enumerate(sample_name)}
+            # info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+            # 每个sample当前排序到的位置的信息
+
+            # 判断是否完成全部排序，跳出循环
+            if current_index == [None for i in range(len(sample_name))]:
+                break
+
+            ### 普通排序
+            # 每一轮排序的最小值
+            current_sort_min = list(current_info.items())[0]  # ('a', [1, 2])/('a', [None, 0])
+            for i, j in enumerate(current_info.items()):
+                # print(j[1][0])
+                if current_sort_min[1] == [None, 0] and j[1] != [None, 0]:
+                    current_sort_min = j
+                if current_sort_min[1] != [None, 0] and j[1] != [None, 0]:
+                    if j[1][0] < current_sort_min[1][0]:
+                        current_sort_min = j
+            current_sort_line[current_sort_min[0]] = current_sort_min[1]  # 将最小值放到正在填充的那行中
+            # 开始比较
+            for i, j in enumerate(current_info.items()):
+                if j[1] != [None, 0]:
+                    if j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line[j[0]] = j[1]
+                        current_index[i] += 1  # 序号向下走一位
+                        if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                            current_index[i] = None
+
+            ### 判断current_sort_line中不为空的后面一个是否在阈值内 更新current_sort_line_replace  current_sort_line
+            for i, j in enumerate(current_sort_line.items()):  # j = ('a', [1, 2])
+                if j[1] != [None, 0] and current_index[i] != None:
+                    # 他的后一个
+                    print(current_sort_line)
+                    print(current_index)
+                    print(self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2])
+                    next_info = {j[0]: [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]}
+                    # next_info = {"c":[9,8]}
+                    ## 判断下一个是否在范围内
+                    if next_info[j[0]][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line_next = copy.deepcopy(current_sort_line)
+                        current_sort_line_next[j[0]] = next_info[j[0]]
+                        ## 比较current_sort_line_next和current_sort_line的方差
+                        if self.help_std(current_sort_line_next) < self.help_std(current_sort_line):
+                            # std小，在current_sort_line_replace中换原值，在current_sort_line中替换next,
+                            current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                            current_sort_line[j[0]] = next_info[j[0]]
+                            current_index[i] += 1  # 序号向下走一位
+                            if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                current_index[i] = None
+
+            ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+            if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                # 添加完成后将current_sort_line至空，开始新的一行排序
+            else:  ### current_sort_line_replace不为空
+                # 找到当前current_sort_line的最小值
+                current_sort_min = list(current_sort_line.items())[0]  # 有可能是（"a"，[None, 0])
+                for i, j in enumerate(current_sort_line.items()):
+                    if current_sort_min[1] == [None, 0] and j[1] != [None, 0]:
+                        current_sort_min = j
+                    if current_sort_min[1] != [None, 0] and j[1] != [None, 0]:
+                        if current_sort_min[1][0] > j[1][0]:
+                            current_sort_min = j
+                # 看之前是空的的后一位在不在新范围内
+                for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                    if j[1] == [None, 0]:
+                        if current_index[i] != None:
+                            if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                                current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
+                                current_index[i] += 1  # 序号向下走一位
+                                if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                    current_index[i] = None
+                # 以上将所有能放在current_sort_line 和current_sort_line_replace中的都取出
+                # 接下来看看current_sort_line还有哪些可以放到current_sort_line_replace
+                for i, j in enumerate(current_sort_line.items()):
+                    if j[1] != [None, 0] and current_sort_line_replace[j[0]] == [None, 0]:  # 看看底下的能不能放上面
+                        temp_current_sort_line = copy.deepcopy(current_sort_line)
+                        temp_current_sort_line_replace = copy.deepcopy(current_sort_line_replace)
+                        temp_current_sort_line_replace[j[0]] = temp_current_sort_line[j[0]]
+                        temp_current_sort_line[j[0]] = [None, 0]
+                        if self.help_std(temp_current_sort_line) < self.help_std(current_sort_line):  # 换
+                            current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                            current_sort_line[j[0]] = [None, 0]
+
+                # 将current_sort_line和current_sort_line_replace都更新到self.sort_data_by_MTU
+                temp_dict = {}
+                for each in current_sort_line_replace.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                # 添加完成后将current_sort_line和current_sort_line_replace至空，开始新的一行排序
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}
+
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        print(self.sort_data_by_MTU)
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def sort_data_by_MTU5(self):
+        # 两次std比较中，二次都比较(std当前行+std上一行) 加上循环，判断当前行是否有改变
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        current_index = [0 for i in range(len(sample_name))]  # 每个sample当前排序到的位置
+        current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+        current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}  # current_sort_line_before
+
+        while True:
+            current_info = {}
+            for i, j in enumerate(sample_name):
+                if current_index[i] == None:
+                    current_info[j] = [None, 0]
+                else:
+                    current_info[j] = [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]]
+            # current_info = {j: [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]] for i, j in enumerate(sample_name)}
+            # info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+            # 每个sample当前排序到的位置的信息
+
+            # 判断是否完成全部排序，跳出循环
+            if current_index == [None for i in range(len(sample_name))]:
+                break
+
+            ### 普通排序
+            # 每一轮排序的最小值
+            current_sort_min = self.help_min(current_info)
+            current_sort_line[current_sort_min[0]] = current_sort_min[1]  # 将最小值放到正在填充的那行中
+            # 开始比较
+            for i, j in enumerate(current_info.items()):
+                if j[1] != [None, 0]:
+                    if j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line[j[0]] = j[1]
+                        current_index[i] += 1  # 序号向下走一位
+                        if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                            current_index[i] = None
+
+            ### 判断current_sort_line中不为空的后面一个是否在阈值内 更新current_sort_line_replace  current_sort_line
+            flag_next_replace = 1  # 有发生下一个把前一个替换的情况
+            while flag_next_replace == 1:
+                flag_next_replace = 0
+                for i, j in enumerate(current_sort_line.items()):  # j = ('a', [1, 2])
+                    if j[1] != [None, 0] and current_index[i] != None:
+                        # 他的后一个
+                        # print(current_sort_line)
+                        # print(current_index)
+                        # print(self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2])
+                        next_info = {j[0]: [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]}
+                        # next_info = {"c":[9,8]}
+                        ## 判断下一个是否在范围内
+                        if next_info[j[0]][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                            current_sort_line_next = copy.deepcopy(current_sort_line)
+                            current_sort_line_next[j[0]] = next_info[j[0]]
+                            # print("next_info", next_info)
+                            # print(current_sort_line)
+                            # print(current_sort_line_next)
+                            current_sort_line_replace_next = copy.deepcopy(current_sort_line_replace)
+                            current_sort_line_replace_next[j[0]] = current_sort_line[j[0]]
+                            # print(current_sort_line_replace)
+                            # print(current_sort_line_replace_next)
+                            # print("next",self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next))
+                            # print(self.help_std(current_sort_line)+self.help_std(current_sort_line_replace))
+                            ## 比较current_sort_line_next和current_sort_line的方差
+                            if (self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next)) < (self.help_std(current_sort_line)+self.help_std(current_sort_line_replace)):
+                                # std小，在current_sort_line_replace中换原值，在current_sort_line中替换next,
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = next_info[j[0]]
+                                current_index[i] += 1  # 序号向下走一位
+                                flag_next_replace = 1  # 有发生下一个把前一个替换的情况
+                                current_sort_min = self.help_min(current_sort_line)  # 更新当前行的最小值
+                                if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                    current_index[i] = None
+
+            ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+            if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                # 添加完成后将current_sort_line至空，开始新的一行排序
+            else:  ### current_sort_line_replace不为空
+                flag_down_go_up = 1
+                while flag_down_go_up == 1:
+                    flag_down_go_up = 0
+                    #  找到当前current_sort_line的最小值
+                    current_sort_min = self.help_min(current_sort_line)
+                    # 看之前是空的的后一位在不在新范围内
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] == [None, 0]:
+                            if current_index[i] != None:
+                                if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                                    current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
+                                    current_index[i] += 1  # 序号向下走一位
+                                    flag_replace = 1  # 替换
+                                    if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                        current_index[i] = None
+                    # 以上将所有能放在current_sort_line 和current_sort_line_replace中的都取出
+                    # 接下来看看current_sort_line还有哪些可以放到current_sort_line_replace
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] != [None, 0] and current_sort_line_replace[j[0]] == [None, 0]:  # 看看底下的能不能放上面
+                            temp_current_sort_line = copy.deepcopy(current_sort_line)
+                            temp_current_sort_line_replace = copy.deepcopy(current_sort_line_replace)
+                            temp_current_sort_line_replace[j[0]] = temp_current_sort_line[j[0]]
+                            temp_current_sort_line[j[0]] = [None, 0]
+                            # print(j)
+                            # print(current_sort_line_replace)
+                            # print(temp_current_sort_line_replace)
+                            # print(current_sort_line)
+                            # print(temp_current_sort_line)
+                            # print("temp",self.help_std(temp_current_sort_line) + self.help_std(temp_current_sort_line_replace))
+                            # print(self.help_std(current_sort_line) + self.help_std(current_sort_line_replace))
+                            if (self.help_std(temp_current_sort_line) + self.help_std(temp_current_sort_line_replace)) < (self.help_std(current_sort_line) + self.help_std(current_sort_line_replace)):  # 换
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = [None, 0]
+                                flag_down_go_up = 1
+
+                # 将current_sort_line和current_sort_line_replace都更新到self.sort_data_by_MTU
+                temp_dict = {}
+                for each in current_sort_line_replace.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                # 添加完成后将current_sort_line和current_sort_line_replace至空，开始新的一行排序
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}
+
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        # print(self.sort_data_by_MTU)
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def sort_data_by_MTU6(self):
+        # 两次std比较中，二次都比较(std当前行+std上一行)  加一个大循环
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        current_index = [0 for i in range(len(sample_name))]  # 每个sample当前排序到的位置
+        current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+        current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}  # current_sort_line_before
+
+        while True:
+            current_info = {}
+            for i, j in enumerate(sample_name):
+                if current_index[i] == None:
+                    current_info[j] = [None, 0]
+                else:
+                    current_info[j] = [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]]
+            # current_info = {j: [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]] for i, j in enumerate(sample_name)}
+            # info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+            # 每个sample当前排序到的位置的信息
+
+            # 判断是否完成全部排序，跳出循环
+            if current_index == [None for i in range(len(sample_name))]:
+                break
+
+            ### 普通排序
+            # 每一轮排序的最小值
+            current_sort_min = self.help_min(current_info)
+            current_sort_line[current_sort_min[0]] = current_sort_min[1]  # 将最小值放到正在填充的那行中
+            # 开始比较
+            for i, j in enumerate(current_info.items()):
+                if j[1] != [None, 0]:
+                    if j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line[j[0]] = j[1]
+                        current_index[i] += 1  # 序号向下走一位
+                        flag_replace = 1  # 替换
+                        if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                            current_index[i] = None
+
+            flag_replace = 1  # 有发生下一个把前一个替换的情况
+            while flag_replace == 1:
+                flag_replace = 0
+                ### 判断current_sort_line中不为空的后面一个是否在阈值内 更新current_sort_line_replace  current_sort_line
+                for i, j in enumerate(current_sort_line.items()):  # j = ('a', [1, 2])
+                    if j[1] != [None, 0] and current_index[i] != None:
+                        # 他的后一个
+                        # print(current_sort_line)
+                        # print(current_index)
+                        # print(self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2])
+                        next_info = {j[0]: [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]}
+                        # next_info = {"c":[9,8]}
+                        ## 判断下一个是否在范围内
+                        if next_info[j[0]][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                            current_sort_line_next = copy.deepcopy(current_sort_line)
+                            current_sort_line_next[j[0]] = next_info[j[0]]
+                            # print("next_info", next_info)
+                            # print(current_sort_line)
+                            # print(current_sort_line_next)
+                            current_sort_line_replace_next = copy.deepcopy(current_sort_line_replace)
+                            current_sort_line_replace_next[j[0]] = current_sort_line[j[0]]
+                            # print(current_sort_line_replace)
+                            # print(current_sort_line_replace_next)
+                            # print("next",self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next))
+                            # print(self.help_std(current_sort_line)+self.help_std(current_sort_line_replace))
+                            ## 比较current_sort_line_next和current_sort_line的方差
+                            if (self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next)) < (self.help_std(current_sort_line)+self.help_std(current_sort_line_replace)):
+                                # std小，在current_sort_line_replace中换原值，在current_sort_line中替换next,
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = next_info[j[0]]
+                                current_index[i] += 1  # 序号向下走一位
+                                flag_replace = 1  # 替换
+                                if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                    current_index[i] = None
+
+                ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+                if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                    break
+
+                else:  ### current_sort_line_replace不为空
+                    # 找到当前current_sort_line的最小值
+                    current_sort_min = self.help_min(current_sort_line)
+                    # 看之前是空的的后一位在不在新范围内
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] == [None, 0]:
+                            if current_index[i] != None:
+                                if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                                    current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
+                                    current_index[i] += 1  # 序号向下走一位
+                                    flag_replace = 1  # 替换
+                                    if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                        current_index[i] = None
+                    # 以上将所有能放在current_sort_line 和current_sort_line_replace中的都取出
+                    # 接下来看看current_sort_line还有哪些可以放到current_sort_line_replace
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] != [None, 0] and current_sort_line_replace[j[0]] == [None, 0]:  # 看看底下的能不能放上面
+                            temp_current_sort_line = copy.deepcopy(current_sort_line)
+                            temp_current_sort_line_replace = copy.deepcopy(current_sort_line_replace)
+                            temp_current_sort_line_replace[j[0]] = temp_current_sort_line[j[0]]
+                            temp_current_sort_line[j[0]] = [None, 0]
+                            # print(j)
+                            # print(current_sort_line_replace)
+                            # print(temp_current_sort_line_replace)
+                            # print(current_sort_line)
+                            # print(temp_current_sort_line)
+                            # print("temp",self.help_std(temp_current_sort_line) + self.help_std(temp_current_sort_line_replace))
+                            # print(self.help_std(current_sort_line) + self.help_std(current_sort_line_replace))
+                            if (self.help_std(temp_current_sort_line) + self.help_std(temp_current_sort_line_replace)) < (self.help_std(current_sort_line) + self.help_std(current_sort_line_replace)):  # 换
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = [None, 0]
+                                flag_replace = 1  # 替换
+
+            ##### 以上current_sort_line和current_sort_line_replace都确定好，下来更新到self.sort_data_by_MTU
+            ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+            if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+            else:
+                # 将current_sort_line和current_sort_line_replace都更新到self.sort_data_by_MTU
+                temp_dict = {}
+                for each in current_sort_line_replace.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                # 添加完成后将current_sort_line和current_sort_line_replace至空，开始新的一行排序
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}
+
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        # print(self.sort_data_by_MTU)
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def sort_data_by_MTU7(self):
+        # 普通比较，只看整数位
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        all_dataframes = copy.deepcopy(self.dict_nor_or_rel)
+        min_in_sorted = float("inf")
+        unsorted_sample = {temp[0]: [temp[1]["Size"].iloc[0], temp[1]["Height"].iloc[0]] for temp in
+                           all_dataframes.items()}
+        while all_dataframes != {}:
+            min_in_sorted = float("inf")
+            each_line_sorted = {each_sample: [None, 0] for each_sample in sample_name}  # 大表中排好序的每一行的sample_name
+            # ----------------- 本次循环结束 代表大表中每一行排序结束-----------------------
+            for each in range(len(sample_name)):
+                min_sample = min(unsorted_sample.items(),
+                                 key=lambda a: a[1])  # ('dfD07_DS4.fsa': [0.13, 1.4615384615384615]) 找到本轮未排序的最小值
+                if min_in_sorted == float("inf"):  # 判断之前是否排序过
+                    min_in_sorted = min_sample[1][0]
+                    each_line_sorted[min_sample[0]] = min_sample[1]
+                    #     print(all_dataframes[min_sample[0]])
+                    # ---------把各个DataFrame中添加到each_line_sorted里的行删掉--------
+                    all_dataframes[min_sample[0]].drop(index=0, inplace=True)
+                    all_dataframes[min_sample[0]] = all_dataframes[min_sample[0]].reset_index(drop=True)
+                    # ---------更新未排序的相应的值--------
+                    unsorted_sample[min_sample[0]] = [float("inf"), float("inf")]
+
+                else:
+                    if self.var_sort_ranging.get() <= 1:
+                        # 判断排过序的最小值和未排序的最小值是否相差1以内 threshold<1时，当数据个位不同，重启一行
+                        if (min_sample[1][0] - min_in_sorted <= self.var_sort_ranging.get()) and (min_sample[1][0]%10//1 == min_in_sorted%10//1):
+                            # min_in_sorted = min_sample[1][0]
+                            each_line_sorted[min_sample[0]] = min_sample[1]
+                            # ---------把各个DataFrame中添加到each_line_sorted里的行删掉--------
+                            all_dataframes[min_sample[0]].drop(0, inplace=True)
+                            all_dataframes[min_sample[0]] = all_dataframes[min_sample[0]].reset_index(drop=True)
+                            # ---------更新未排序的相应的值--------
+                            unsorted_sample[min_sample[0]] = [float("inf"), float("inf")]
+                        else:  # 跳出该行排序
+                            break
+                    else:
+                        if min_sample[1][0] - min_in_sorted <= self.var_sort_ranging.get():
+                            # min_in_sorted = min_sample[1][0]
+                            each_line_sorted[min_sample[0]] = min_sample[1]
+                            # ---------把各个DataFrame中添加到each_line_sorted里的行删掉--------
+                            all_dataframes[min_sample[0]].drop(0, inplace=True)
+                            all_dataframes[min_sample[0]] = all_dataframes[min_sample[0]].reset_index(drop=True)
+                            # ---------更新未排序的相应的值--------
+                            unsorted_sample[min_sample[0]] = [float("inf"), float("inf")]
+                        else:  # 跳出该行排序
+                            break
+
+            # ------------ 大表中每一行排序结束  将each_line_sorted更新到大表中  更新unsorted_sample----------
+            temp_dict = {}
+            for each in each_line_sorted.items():
+                temp_dict[each[0] + "_Size"] = each[1][0]
+                temp_dict[each[0] + "_Height"] = each[1][1]
+            self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+
+            delete = []
+            for each in unsorted_sample.items():
+                if each[1] == [float("inf"), float("inf")]:
+                    #             print(len(all_dataframes[each[0]]))
+                    #             print(each[0])
+                    if len(all_dataframes[each[0]]) == 0:
+                        all_dataframes.pop(each[0])
+                        delete.append(each[0])
+                    else:
+                        unsorted_sample[each[0]] = [all_dataframes[each[0]]["Size"].iloc[0],
+                                                    all_dataframes[each[0]]["Height"].iloc[0]]
+            for each in delete:  # all_dataframes中删除掉的samplename, unsorted_sample中也要删除
+                unsorted_sample.pop(each)
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def sort_data_by_MTU8(self):
+        # 普通比较用整数位  第一次用std比较 第二次比较和最小值的差 加一个大循环
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        current_index = [0 for i in range(len(sample_name))]  # 每个sample当前排序到的位置
+        current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+        current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}  # current_sort_line_before
+
+        while True:
+            current_info = {}
+            for i, j in enumerate(sample_name):
+                if current_index[i] == None:
+                    current_info[j] = [None, 0]
+                else:
+                    current_info[j] = [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]]
+            # current_info = {j: [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]] for i, j in enumerate(sample_name)}
+            # info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+            # 每个sample当前排序到的位置的信息
+
+            # 判断是否完成全部排序，跳出循环
+            if current_index == [None for i in range(len(sample_name))]:
+                break
+
+            ### 普通排序
+            # 每一轮排序的最小值
+            current_sort_min = self.help_min(current_info)
+            current_sort_line[current_sort_min[0]] = current_sort_min[1]  # 将最小值放到正在填充的那行中
+            # 开始比较
+            if self.var_sort_ranging.get() <= 1:  # 只看整数位
+                for i, j in enumerate(current_info.items()):
+                    if j[1] != [None, 0]:
+                        if (j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get()) and (j[1][0] % 10 // 1 == current_sort_min[1][0]% 10 // 1):
+                            current_sort_line[j[0]] = j[1]
+                            current_index[i] += 1  # 序号向下走一位
+                            if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                current_index[i] = None
+            else:
+                for i, j in enumerate(current_info.items()):
+                    if j[1] != [None, 0]:
+                        if j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                            current_sort_line[j[0]] = j[1]
+                            current_index[i] += 1  # 序号向下走一位
+                            if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                current_index[i] = None
+
+
+            flag_replace = 1  # 有发生下一个把前一个替换的情况
+            while flag_replace == 1:
+                flag_replace = 0
+                ### 判断current_sort_line中不为空的后面一个是否在阈值内 更新current_sort_line_replace  current_sort_line
+                for i, j in enumerate(current_sort_line.items()):  # j = ('a', [1, 2])
+                    if j[1] != [None, 0] and current_index[i] != None:
+                        # 他的后一个
+                        next_info = {j[0]: [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]}
+                        # next_info = {"c":[9,8]}
+                        ## 判断下一个是否在范围内
+                        if next_info[j[0]][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                            current_sort_line_next = copy.deepcopy(current_sort_line)
+                            current_sort_line_next[j[0]] = next_info[j[0]]
+                            current_sort_line_replace_next = copy.deepcopy(current_sort_line_replace)
+                            current_sort_line_replace_next[j[0]] = current_sort_line[j[0]]
+                            ## 比较current_sort_line_next和current_sort_line的方差
+                            if (self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next)) < (self.help_std(current_sort_line)+self.help_std(current_sort_line_replace)):
+                                # std小，在current_sort_line_replace中换原值，在current_sort_line中替换next,
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = next_info[j[0]]
+                                current_index[i] += 1  # 序号向下走一位
+                                flag_replace = 1  # 替换
+                                if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                    current_index[i] = None
+
+                ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+                if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                    break
+
+                else:  ### current_sort_line_replace不为空
+                    # 找到当前current_sort_line的最小值
+                    current_sort_min = self.help_min(current_sort_line)
+                    # 看之前是空的的后一位在不在新范围内
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] == [None, 0]:
+                            if current_index[i] != None:
+                                if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                                    current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
+                                    current_index[i] += 1  # 序号向下走一位
+                                    flag_replace = 1  # 替换
+                                    if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                        current_index[i] = None
+                    # 以上将所有能放在current_sort_line 和current_sort_line_replace中的都取出
+                    # 接下来看看current_sort_line还有哪些可以放到current_sort_line_replace    比较时用距离两行都存在的值中的最小值确定
+                    # 先找到两行都存在值的最小值
+                    double_exist_replace_min = float("inf")
+                    double_exist_min = float("inf")
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                            if j[1] != [None, 0] and current_sort_line_replace[j[0]] != [None, 0]:  # 看看底下的能不能放上面
+                                double_exist_replace_min = min(double_exist_replace_min, current_sort_line_replace[j[0]][0])
+                                double_exist_min = min(double_exist_min,j[1][0])
+                    # print(double_exist_replace_min)
+                    # print(double_exist_min)
+                    # 再看底下的能不能放上去
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] != [None, 0] and current_sort_line_replace[j[0]] == [None, 0]:  # 看看底下的能不能放上面
+                            if (abs(j[1][0] - double_exist_min)) > (abs(j[1][0] - double_exist_replace_min)):
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = [None, 0]
+                                flag_replace = 1  # 替换
+
+            ##### 以上current_sort_line和current_sort_line_replace都确定好，下来更新到self.sort_data_by_MTU
+            ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+            if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+            else:
+                # 将current_sort_line和current_sort_line_replace都更新到self.sort_data_by_MTU
+                temp_dict = {}
+                for each in current_sort_line_replace.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                # 添加完成后将current_sort_line和current_sort_line_replace至空，开始新的一行排序
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}
+
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        # print(self.sort_data_by_MTU)
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+    def sort_data_by_MTU9(self):
+        # 普通比较  第一次用std比较 第二次比较和最小值的差 加一个大循环
+        # self.sort_ranging  self.dict_nor_or_rel
+        sample_name = list(self.dict_nor_or_rel.keys())
+
+        sort_data_columns_name = []
+        for temp in sample_name:
+            sort_data_columns_name.append(temp + "_Size")
+            sort_data_columns_name.append(temp + "_Height")
+
+        self.sort_data_by_MTU = pd.DataFrame(columns=sort_data_columns_name)  # 最终返回结果
+
+        current_index = [0 for i in range(len(sample_name))]  # 每个sample当前排序到的位置
+        current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+        current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}  # current_sort_line_before
+
+        while True:
+            current_info = {}
+            for i, j in enumerate(sample_name):
+                if current_index[i] == None:
+                    current_info[j] = [None, 0]
+                else:
+                    current_info[j] = [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]]
+            # current_info = {j: [self.dict_nor_or_rel[j].iloc[current_index[i], 2], self.dict_nor_or_rel[j].iloc[current_index[i], 3]] for i, j in enumerate(sample_name)}
+            # info = {"a":[1,2],"b":[2,3],"c":[9,8]}
+            # 每个sample当前排序到的位置的信息
+
+            # 判断是否完成全部排序，跳出循环
+            if current_index == [None for i in range(len(sample_name))]:
+                break
+
+            ### 普通排序
+            # 每一轮排序的最小值
+            current_sort_min = self.help_min(current_info)
+            current_sort_line[current_sort_min[0]] = current_sort_min[1]  # 将最小值放到正在填充的那行中
+            print("current_info", current_info)
+            print("current_index", current_index)
+            # 开始比较
+            for i, j in enumerate(current_info.items()):
+                if j[1] != [None, 0]:
+                    if j[1][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                        current_sort_line[j[0]] = j[1]
+                        current_index[i] += 1  # 序号向下走一位
+                        if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                            current_index[i] = None
+            print("current_sort_min", current_sort_min)
+            print("current_sort_line", current_sort_line)
+            print("current_index", current_index)
+
+
+            flag_replace = 1  # 有发生下一个把前一个替换的情况
+            while flag_replace == 1:
+                flag_replace = 0
+                ### 判断current_sort_line中不为空的后面一个是否在阈值内 更新current_sort_line_replace  current_sort_line
+                print("new")
+                print("current_sort_line", current_sort_line)
+                for i, j in enumerate(current_sort_line.items()):  # j = ('a', [1, 2])
+                    if j[1] != [None, 0] and current_index[i] != None:
+                        # 他的后一个
+                        next_info = {j[0]: [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]}
+                        # next_info = {"c":[9,8]}
+                        ## 判断下一个是否在范围内
+                        if next_info[j[0]][0] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                            current_sort_line_next = copy.deepcopy(current_sort_line)
+                            current_sort_line_next[j[0]] = next_info[j[0]]
+                            current_sort_line_replace_next = copy.deepcopy(current_sort_line_replace)
+                            current_sort_line_replace_next[j[0]] = current_sort_line[j[0]]
+                            ## 比较current_sort_line_next和current_sort_line的方差
+                            if (self.help_std(current_sort_line_next)+self.help_std(current_sort_line_replace_next)) < (self.help_std(current_sort_line)+self.help_std(current_sort_line_replace)):
+                                # std小，在current_sort_line_replace中换原值，在current_sort_line中替换next,
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = next_info[j[0]]
+                                current_index[i] += 1  # 序号向下走一位
+                                flag_replace = 1  # 替换
+                                if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                    current_index[i] = None
+                print("current_sort_line", current_sort_line)
+                print("current_sort_line_replace", current_sort_line_replace)
+                print("current_index", current_index)
+
+                ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+                if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                    break
+
+                else:  ### current_sort_line_replace不为空
+                    # 找到当前current_sort_line的最小值
+                    current_sort_min = self.help_min(current_sort_line)
+                    # 看之前是空的的后一位在不在新范围内
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] == [None, 0]:
+                            if current_index[i] != None:
+                                if self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2] - current_sort_min[1][0] <= self.var_sort_ranging.get():
+                                    current_sort_line[j[0]] = [self.dict_nor_or_rel[j[0]].iloc[current_index[i], 2], self.dict_nor_or_rel[j[0]].iloc[current_index[i], 3]]
+                                    current_index[i] += 1  # 序号向下走一位
+                                    flag_replace = 1  # 替换
+                                    if current_index[i] > self.dict_nor_or_rel[j[0]].shape[0] - 1:
+                                        current_index[i] = None
+                    # 以上将所有能放在current_sort_line 和current_sort_line_replace中的都取出
+                    # 接下来看看current_sort_line还有哪些可以放到current_sort_line_replace    比较时用距离两行都存在的值中的最小值确定
+                    # 先找到两行都存在值的最小值
+                    double_exist_replace_min = float("inf")
+                    double_exist_min = float("inf")
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                            if j[1] != [None, 0] and current_sort_line_replace[j[0]] != [None, 0]:  # 看看底下的能不能放上面
+                                double_exist_replace_min = min(double_exist_replace_min, current_sort_line_replace[j[0]][0])
+                                double_exist_min = min(double_exist_min,j[1][0])
+                    # print(double_exist_replace_min)
+                    # print(double_exist_min)
+                    # 再看底下的能不能放上去
+                    for i, j in enumerate(current_sort_line.items()):  # j =（"a"，[None, 0])
+                        if j[1] != [None, 0] and current_sort_line_replace[j[0]] == [None, 0]:  # 看看底下的能不能放上面
+                            if (abs(j[1][0] - double_exist_min)) > (abs(j[1][0] - double_exist_replace_min)):
+                                current_sort_line_replace[j[0]] = current_sort_line[j[0]]
+                                current_sort_line[j[0]] = [None, 0]
+                                flag_replace = 1  # 替换
+                print("current_sort_line", current_sort_line)
+                print("current_sort_line_replace", current_sort_line_replace)
+                print("current_index", current_index)
+
+            ##### 以上current_sort_line和current_sort_line_replace都确定好，下来更新到self.sort_data_by_MTU
+            ### 下一个的数都不在阈值内的，直接更新current_sort_line到self.sort_data_by_MTU
+            if current_sort_line_replace == {each_sample: [None, 0] for each_sample in sample_name}:
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+            else:
+                # 将current_sort_line和current_sort_line_replace都更新到self.sort_data_by_MTU
+                temp_dict = {}
+                for each in current_sort_line_replace.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                temp_dict = {}
+                for each in current_sort_line.items():
+                    temp_dict[each[0] + "_Size"] = each[1][0]
+                    temp_dict[each[0] + "_Height"] = each[1][1]
+                self.sort_data_by_MTU = self.sort_data_by_MTU.append(temp_dict, ignore_index=True)
+                # 添加完成后将current_sort_line和current_sort_line_replace至空，开始新的一行排序
+                current_sort_line = {each_sample: [None, 0] for each_sample in sample_name}
+                current_sort_line_replace = {each_sample: [None, 0] for each_sample in sample_name}
+
+
+        ###  add mean MTU column
+        self.sort_data_by_MTU["mean_MTU"] = round(self.sort_data_by_MTU[
+                                                      [i for i in self.sort_data_by_MTU.columns.tolist() if
+                                                       i.find("Size") != -1]].mean(axis=1), 2)
+
+        # print(self.sort_data_by_MTU)
+        self.button_sort_data_by_MTU_view.config(state="normal")
+        self.button_sort_data_by_MTU_download.config(state="normal")
+
+
 
     def show_sort_data_by_MTU(self):
         # 首先删除原有表单中的内容
@@ -1002,7 +2005,8 @@ class FrameAnalysedData(ttk.Frame):
         print(new_annotation)
 
         # 在dataframe中更改
-        row = int(self.edit_annotation_row[1:]) - 1
+        # row = int(self.edit_annotation_row[1:]) - 1
+        row = int(self.edit_annotation_row[1:], 16) - 1  # I00F
         print(row)
         self.annotated_result.iloc[row, -1] = new_annotation
         print(self.annotated_result)
@@ -1119,7 +2123,7 @@ class FrameAnalysedData(ttk.Frame):
         self.label_show_sort_ranging.pack(side="left", padx=5)
 
         self.button_sort_data_by_MTU = ttk.Button(self.frame_canvas_process, text="sort data by MTU",
-                                                  command=self.sort_data_by_MTU2)
+                                                  command=self.sort_data_by_MTU9)
         self.button_sort_data_by_MTU.pack(padx=3, pady=5, anchor="w")
         self.button_sort_data_by_MTU_view = ttk.Button(self.frame_canvas_process, text="view", state="disabled",
                                                        command=self.show_sort_data_by_MTU)

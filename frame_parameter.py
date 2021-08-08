@@ -174,6 +174,11 @@ class FrameParameter(ttk.Frame):
             exec('self.combobox_temp{}.config(state="disabled")'.format(i))
         print(self.list_user_choose_referencewell)  # [] is valid
         self.combobox_relnor.config(state='readonly')
+        if self.var_reference_number.get() == 0:
+            self.combobox_relnor["values"] = ["Relativization"]
+        else:
+            self.combobox_relnor["values"] = ["Normalization", "Relativization"]
+
         self.button_sure_choose_reference.config(state='disabled')
 
     def choose_normal_standards(self, *args):

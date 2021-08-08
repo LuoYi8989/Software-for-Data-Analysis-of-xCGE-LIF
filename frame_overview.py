@@ -246,6 +246,7 @@ class FrameOverview(ttk.Frame):
         self.choose_replicate()
         self.label_group_choose_replicates.config(text="group %d" % self.group_num)
         # self.button_ensure_choose_replicates.config(state='disabled')
+        self.button_ensure_input_replicates_name.config(state='disabled')
 
     def choose_replicate(self):
         """让用户在每个replicates_group中选择相应的samples"""
@@ -288,7 +289,7 @@ class FrameOverview(ttk.Frame):
         self.combobox_choose_colour.config(state='disabled')
         """获取用户的选择，选完后，让用户输入group_name"""
         # self.dict_replicates_groups
-        self.combobox_group_number_replicates.config(state='disabled')
+        # self.combobox_group_number_replicates.config(state='disabled')
 
         ### 获取用户的选择
         for num in range(self.group_number_replicates):
